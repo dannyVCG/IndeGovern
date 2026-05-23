@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InitiativeStatus {
+  NOT_STARTED
+  ON_TRACK
+  AT_RISK
+  DELAYED
+  ESCALATED
+  COMPLETED
+  ARCHIVED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskStatus {
+  OPEN
+  RESOLVED
+}
+
+enum DecisionStatus {
+  RECOMMENDED
+  PENDING
+  APPROVED
+  REJECTED
+  RESOLVED
+}
+
+enum SourceSystem {
+  AHA
+  JIRA
+  TEAMS
+  SHAREPOINT
+  MANUAL
+  KICKOFF_DECK
+}
+
+model Initiative {
+  id          String          @id @default(cuid())
+  name        String
+  owner       String?
+  capability  String?         // EMS / ECO AI / Omni AI / DAAI
+  box         String?         // Box 1–4
+  status      InitiativeStatus @default(ON_TRACK)
+  confidence  Int             @default(75)
+  lastUpdated DateTime        @default(now())
+
+  // mappings (for later integrations)
+  jiraKey     String?
+  ahaId       String?
+  teamsChannelId String?
+  evidenceRootUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  risks     Risk[]
+  decisions Decision[]
+  signals   Signal[]
+  evidence  Evidence[]
+}
+
+model Risk {
+  id           String     @id @default(cuid())
+  initiativeId String
+  initiative   Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?
+  severity     Severity   @default(MEDIUM)
+  status       RiskStatus @default(OPEN)
+  source       SourceSystem @default(MANUAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Decision {
+  id           String       @id @default(cuid())
+  initiativeId String
+  initiative   Initiative   @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+
+  question     String
+  optionsJson  String?      // store options as JSON string for now (simple v1)
+  status       DecisionStatus @default(PENDING)
+  source       SourceSystem @default(MANUAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Signal {
+  id           String     @id @default(cuid())
+  initiativeId String
+  initiative   Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+
+  source       SourceSystem
+  type         String     // e.g. "confidence_driver", "milestone_slip", "blocker", "meeting_decision"
+  payloadJson  String     // store as JSON string for now
+  occurredAt   DateTime   @default(now())
+
+  createdAt DateTime @default(now())
+}
+
+model Evidence {
+  id           String     @id @default(cuid())
+  initiativeId String
+  initiative   Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+
+  url          String
+  title        String?
+  docType      String?    // approval/spec/test/signoff/etc.
+  source       SourceSystem @default(SHAREPOINT)
+  updatedAt    DateTime   @default(now())
+
+  createdAt DateTime @default(now())
+}
